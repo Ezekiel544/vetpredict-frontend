@@ -1297,7 +1297,7 @@ function Sidebar({active,setActive,open,setOpen,theme,setTheme,user,onSignOut}) 
     <>
       <div className={`sbo${open?" open":""}`} onClick={()=>setOpen(false)}/>
       <aside className={`sb${open?" open":""}`}>
-        <div className="sb-logo" onClick={()=>go("dashboard")}><div className="lmark">P</div>PredictChain</div>
+        <div className="sb-logo" onClick={()=>go("dashboard")}>Vetpredict</div>
         <nav className="sb-nav">
           <div className="nlbl">Main</div>
           {nav.map(n=>(

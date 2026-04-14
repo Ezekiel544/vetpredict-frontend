@@ -127,10 +127,10 @@ const injectStyles = (theme) => {
     /* Markets */
     .filters{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:28px;}
     .filters::-webkit-scrollbar{display:none;}
-    .markets-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+    .markets-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;}
     .mcard{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:20px;cursor:pointer;transition:all 0.2s;display:flex;flex-direction:column;gap:14px;}
     .mcard:hover{border-color:var(--green-bd);transform:translateY(-3px);box-shadow:var(--shadow-lg);}
-    .mcard.featured{grid-column:span 2;}
+    .mcard.featured{grid-column:span 1;}
     .mcard-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
     .mcard-timer{font-size:11px;color:var(--text3);font-weight:500;white-space:nowrap;flex-shrink:0;}
     .mcard-timer.urgent{color:var(--red);font-weight:700;}
