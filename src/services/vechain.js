@@ -1,10 +1,11 @@
 /**
  * VeChain wallet integration
- * Supports VeWorld 1.x (window.vechain)
+ * Works on desktop (VeWorld extension) AND mobile (VeWorld in-app browser)
+ * For mobile Chrome: guides user to open in VeWorld browser
  */
 
-const NODE_URL = process.env.REACT_APP_VECHAIN_NODE || "https://node-testnet.vechain.energy";
-const CONTRACT = process.env.REACT_APP_CONTRACT_ADDRESS || "";
+const NODE_URL   = process.env.REACT_APP_VECHAIN_NODE || "https://node-testnet.vechain.energy";
+const CONTRACT   = process.env.REACT_APP_CONTRACT_ADDRESS || "";
 const GENESIS_ID = "0x000000000b2bce3c70bc649a02749e8687721b09ed2e15997f466536b20bb127";
 
 // ─── ABI helpers ──────────────────────────────────────────────
@@ -13,30 +14,36 @@ const encodeBool    = (b) => (b ? "1" : "0").padStart(64, "0");
 const toHex         = (n) => "0x" + BigInt(n).toString(16);
 
 // ─── Function Selectors ───────────────────────────────────────
-const PREDICT_SIG       = "0xebd389fe"; // predict(uint256,bool)
-const CLAIM_SIG         = "0x677bd9ff"; // claimWinnings(uint256)
-const REFUND_SIG        = "0x5b7baf64"; // claimRefund(uint256)
-const WITHDRAW_FEES_SIG = "0x164e68de"; // withdrawFees(address)
+const PREDICT_SIG       = "0xebd389fe";
+const CLAIM_SIG         = "0x677bd9ff";
+const REFUND_SIG        = "0x5b7baf64";
+const WITHDRAW_FEES_SIG = "0x164e68de";
+
+// ─── Detect mobile Chrome (no wallet injected) ────────────────
+export const isMobileChrome = () => {
+  const ua = navigator.userAgent;
+  return /Android|iPhone|iPad/i.test(ua) && /Chrome/i.test(ua) && !window.connex && !window.vechain;
+};
+
+// ─── Open site inside VeWorld mobile browser ─────────────────
+export const openInVeWorld = () => {
+  const url = window.location.href;
+  window.location.href = `veworld://browser?url=${encodeURIComponent(url)}`;
+  setTimeout(() => { window.location.href = "https://www.veworld.net"; }, 2000);
+};
 
 // ─── Detect wallet ────────────────────────────────────────────
-// Checks all known VeWorld injection points
 export const hasConnex = () =>
   !!(window.connex || window.vechain || window.vechain_vendor);
 
-// ─── Wait for VeWorld to inject (mobile can be slow) ─────────
+// ─── Wait for VeWorld to inject ───────────────────────────────
 export const waitForConnex = (timeoutMs = 3000) =>
   new Promise((resolve) => {
     if (hasConnex()) return resolve(true);
     const interval = setInterval(() => {
-      if (hasConnex()) {
-        clearInterval(interval);
-        resolve(true);
-      }
+      if (hasConnex()) { clearInterval(interval); resolve(true); }
     }, 100);
-    setTimeout(() => {
-      clearInterval(interval);
-      resolve(false); // timed out — not available
-    }, timeoutMs);
+    setTimeout(() => { clearInterval(interval); resolve(false); }, timeoutMs);
   });
 
 // ─── Connex singleton ─────────────────────────────────────────
@@ -53,6 +60,10 @@ const getConnex = async () => {
   if (window.connex) {
     _connex = window.connex;
     return _connex;
+  }
+  if (isMobileChrome()) {
+    openInVeWorld();
+    throw new Error("OPEN_IN_VEWORLD");
   }
   throw new Error("VeWorld wallet not detected. Please install VeWorld from veworld.net");
 };
@@ -79,7 +90,6 @@ export const signAuthMessage = async (address, message) => {
     purpose: "agreement",
     payload: { type: "text", content: message },
   }).request();
-
   return {
     signature: result.annex?.signature || result.signature || "",
     signer:    result.annex?.signer    || address,
@@ -92,12 +102,10 @@ export const placePredictionOnChain = async ({ contractMarketId, isYes, stakeVet
   const vendor   = await getVendor();
   const stakeWei = toHex(BigInt(Math.round(Number(stakeVet) * 1e18)));
   const data     = `${PREDICT_SIG}${encodeUint256(contractMarketId)}${encodeBool(isYes)}`;
-
-  const result = await vendor
+  const result   = await vendor
     .sign("tx", [{ to: CONTRACT, value: stakeWei, data }])
     .comment(`Predict ${isYes ? "YES" : "NO"} with ${stakeVet} VET`)
     .request();
-
   return result.txid;
 };
 
@@ -121,6 +129,19 @@ export const claimRefundOnChain = async ({ contractPredictionId }) => {
   const result = await vendor
     .sign("tx", [{ to: CONTRACT, value: "0x0", data }])
     .comment("Claim market refund")
+    .request();
+  return result.txid;
+};
+
+// ─── Withdraw platform fees ───────────────────────────────────
+export const withdrawFeesOnChain = async ({ toAddress }) => {
+  if (!CONTRACT) throw new Error("Contract address not set.");
+  const vendor        = await getVendor();
+  const paddedAddress = toAddress.replace("0x", "").toLowerCase().padStart(64, "0");
+  const data          = `${WITHDRAW_FEES_SIG}${paddedAddress}`;
+  const result        = await vendor
+    .sign("tx", [{ to: CONTRACT, value: "0x0", data }])
+    .comment("Withdraw platform fees")
     .request();
   return result.txid;
 };
@@ -152,17 +173,4 @@ export const getVetBalance = async (address) => {
   } catch {
     return null;
   }
-};
-
-// ─── Withdraw platform fees ───────────────────────────────────
-export const withdrawFeesOnChain = async ({ toAddress }) => {
-  if (!CONTRACT) throw new Error("Contract address not set.");
-  const vendor        = await getVendor();
-  const paddedAddress = toAddress.replace("0x", "").toLowerCase().padStart(64, "0");
-  const data          = `${WITHDRAW_FEES_SIG}${paddedAddress}`;
-  const result        = await vendor
-    .sign("tx", [{ to: CONTRACT, value: "0x0", data }])
-    .comment("Withdraw platform fees")
-    .request();
-  return result.txid;
 };

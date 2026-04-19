@@ -22,12 +22,11 @@ export default function App() {
     );
   }
 
-  if (path.startsWith("/admin"))              return <AdminPanel/>;
-  if (path === "/forgot-password")            return <ForgotPasswordPage onBack={()=>window.location.href="/"}/>;
-  if (path === "/reset-password")             return <ResetPasswordPage token={query.get("token")} onSuccess={()=>window.location.href="/"}/>;
-  if (path === "/auth/google/success")        return <GoogleAuthSuccess/>;
+  if (path.startsWith("/admin"))          return <AdminPanel/>;
+  if (path === "/forgot-password")        return <ForgotPasswordPage onBack={()=>window.location.href="/"}/>;
+  if (path === "/reset-password")         return <ResetPasswordPage token={query.get("token")} onSuccess={()=>window.location.href="/"}/>;
+  if (path === "/auth/google/success")    return <GoogleAuthSuccess/>;
 
-  // 404 — unknown path
   if (path !== "/") return (
     <div style={{
       display:"flex",alignItems:"center",justifyContent:"center",
