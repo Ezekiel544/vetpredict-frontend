@@ -255,7 +255,9 @@ const injectStyles = (theme) => {
   el.id = id; el.textContent = css;
   document.head.appendChild(el);
 };
+
 const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 // ─── Static Data ──────────────────────────────────────────────
 const FILTERS = ["All","Sports","Crypto","Entertainment","Politics","Gaming","Stocks"];
 
@@ -315,11 +317,13 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
   const [error, setError]                 = useState("");
   const [form, setForm]                   = useState({ email:"", password:"", displayName:"" });
   const [showVeWorldRedirect, setShowVeWorldRedirect] = useState(false);
+  const [debugInfo, setDebugInfo]         = useState("");
 
   useEffect(() => {
     setTab(defaultTab || "signup");
     setError("");
     setShowVeWorldRedirect(false);
+    setDebugInfo("");
   }, [defaultTab, open]);
 
   useEffect(() => {
@@ -338,6 +342,24 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
     } catch (err) {
       setError(err.response?.data?.error || err.response?.data?.errors?.[0]?.msg || "Something went wrong");
     } finally { setLoading(false); }
+  };
+
+  const handleDebug = () => {
+    const keys = Object.keys(window).filter(k =>
+      k.toLowerCase().includes("ve") ||
+      k.toLowerCase().includes("connex") ||
+      k.toLowerCase().includes("wallet") ||
+      k.toLowerCase().includes("thor")
+    );
+    const info = [
+      "vechain: " + typeof window.vechain,
+      "connex: " + typeof window.connex,
+      "vechain_vendor: " + typeof window.vechain_vendor,
+      "thor: " + typeof window.thor,
+      "keys: " + (keys.join(", ") || "none"),
+    ].join("\n");
+    setDebugInfo(info);
+    alert(info);
   };
 
   const handleWallet = async () => {
@@ -359,13 +381,11 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
       setLoading(false);
 
       if (!available) {
-        // VeWorld not found even after waiting → show redirect UI
         setShowVeWorldRedirect(true);
         return;
       }
     }
 
-    // Desktop or mobile with VeWorld detected → proceed
     setLoading(true);
     try {
       await loginWithWallet();
@@ -404,6 +424,19 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
 
           {error && <div className="error-msg">{error}</div>}
 
+          {/* 🐛 TEMP DEBUG BUTTON — remove after testing */}
+          <button
+            style={{fontSize:11,color:"#999",background:"#f5f5f5",border:"1px solid #ddd",borderRadius:6,padding:"6px 10px",marginBottom:8,width:"100%",cursor:"pointer"}}
+            onClick={handleDebug}
+          >
+            🔍 Debug: Check wallet injection
+          </button>
+          {debugInfo && (
+            <div style={{fontSize:10,color:"#666",background:"#f9f9f9",border:"1px solid #eee",borderRadius:6,padding:"8px",marginBottom:8,whiteSpace:"pre",wordBreak:"break-all"}}>
+              {debugInfo}
+            </div>
+          )}
+
           {/* VeWorld Button or Mobile Redirect UI */}
           {showVeWorldRedirect ? (
             <div style={{background:"#EEEEFF",border:"1.5px solid rgba(92,107,192,0.4)",borderRadius:10,padding:"16px",marginBottom:8,textAlign:"center"}}>
@@ -429,12 +462,7 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
               >
                 Don't have VeWorld? Download it →
               </a>
-              <span
-                style={{fontSize:12,color:"var(--text3)",cursor:"pointer"}}
-                onClick={()=>setShowVeWorldRedirect(false)}
-              >
-                ← Back
-              </span>
+              <span style={{fontSize:12,color:"var(--text3)",cursor:"pointer"}} onClick={()=>setShowVeWorldRedirect(false)}>← Back</span>
             </div>
           ) : (
             <button className="btn btn-vechain btn-block" style={{marginBottom:8}} onClick={handleWallet} disabled={loading}>
@@ -489,6 +517,7 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
     </div>
   );
 }
+
 // ─── Market Card ──────────────────────────────────────────────
 function MarketCard({ market, onPredict }) {
   const yesPercent = market.yesPercent ?? (market.totalPool > 0 ? Math.round(market.yesPool / market.totalPool * 100) : 50);
@@ -561,22 +590,19 @@ export default function Landing() {
           <li><a href="#faq" onClick={e=>{e.preventDefault();scrollTo("faq");}}>FAQ</a></li>
         </ul>
         <div className="navbar-right">
-          {/* Desktop only: theme toggle, log in, get started */}
           <button className="theme-btn" onClick={()=>setTheme(t=>t==="light"?"dark":"light")}>{theme==="dark"?"☀️":"🌙"}</button>
           <button className="btn btn-ghost btn-sm" onClick={()=>openAuth("login")}>Log In</button>
           <button className="btn btn-primary btn-sm" onClick={()=>openAuth("signup")}>Get Started</button>
-          {/* Mobile only: hamburger */}
           <button className="mobile-menu-btn" onClick={()=>setMenuOpen(v=>!v)}>{menuOpen?"✕":"☰"}</button>
         </div>
       </nav>
 
-      {/* Mobile Nav — hamburger dropdown */}
+      {/* Mobile Nav */}
       <div className={`mobile-nav${menuOpen?" open":""}`}>
         <a href="#markets" onClick={e=>{e.preventDefault();setMenuOpen(false);scrollTo("markets");}}>Markets</a>
         <a href="#how" onClick={e=>{e.preventDefault();setMenuOpen(false);scrollTo("how");}}>How it Works</a>
         <a href="#faq" onClick={e=>{e.preventDefault();setMenuOpen(false);scrollTo("faq");}}>FAQ</a>
         <div className="mobile-nav-actions">
-          {/* Theme toggle row */}
           <div className="mobile-theme-row">
             <span>{theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}</span>
             <button className="theme-btn" onClick={()=>setTheme(t=>t==="light"?"dark":"light")} style={{flexShrink:0}}>
@@ -611,14 +637,8 @@ export default function Landing() {
                 ))}
               </div>
             </div>
-
-            {/* Phone image */}
             <div className="hero-img-wrap">
-              <img
-                className="hero-phone-img"
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-qJxos9ksqd1o7HUswM5kazXBHFzvM2.png"
-                alt="VetPredict App"
-              />
+              <img className="hero-phone-img" src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-qJxos9ksqd1o7HUswM5kazXBHFzvM2.png" alt="VetPredict App"/>
             </div>
           </div>
         </section>
@@ -656,11 +676,7 @@ export default function Landing() {
           </div>
           {HOW_IT_WORKS.map((item, i) => (
             <div key={item.step} className="how-step-row">
-              <div style={i%2===1?{order:2}:{}}>
-                <div className="how-card-img">
-                  <img src={item.image} alt={item.title}/>
-                </div>
-              </div>
+              <div style={i%2===1?{order:2}:{}}><div className="how-card-img"><img src={item.image} alt={item.title}/></div></div>
               <div style={i%2===1?{order:1}:{}}>
                 <div className="how-card-text">
                   <span className="how-step-num">{item.step}</span>
@@ -682,11 +698,7 @@ export default function Landing() {
           </div>
           <div className="why-grid">
             {WHY_CHOOSE_US.map(w=>(
-              <div className="why-card" key={w.title}>
-                <div className="why-icon">{w.icon}</div>
-                <h3>{w.title}</h3>
-                <p>{w.desc}</p>
-              </div>
+              <div className="why-card" key={w.title}><div className="why-icon">{w.icon}</div><h3>{w.title}</h3><p>{w.desc}</p></div>
             ))}
           </div>
         </section>
@@ -722,7 +734,7 @@ export default function Landing() {
               <>
                 <div className="newsletter-form">
                   <input type="email" placeholder="Enter your email" value={email} onChange={e=>setEmail(e.target.value)}/>
-                  <button className="btn btn-primary" onClick={()=>{if(email){setSubscribed(true);setEmail("");}}}>Subscribe →</button>
+                  <button className="btn btn-primary" onClick={()=>{if(email){setSubscribed(true);setEmail("");}}}> Subscribe →</button>
                 </div>
                 <p style={{fontSize:12,color:"var(--text3)",marginTop:12}}>No spam. Unsubscribe anytime.</p>
               </>
