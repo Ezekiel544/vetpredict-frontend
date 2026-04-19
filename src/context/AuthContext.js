@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { getMe, loginEmail, signupEmail, getNonce, loginWallet, fetchVetPrice, linkWallet } from "../services/api";
-import { getWalletAddress, signAuthMessage, hasConnex, getVetBalance } from "../services/vechain";
+import { getWalletAddress, signAuthMessage, hasConnex, waitForConnex, getVetBalance } from "../services/vechain";
 import { io } from "socket.io-client";
 
 const AuthContext = createContext(null);
@@ -82,7 +82,9 @@ export function AuthProvider({ children }) {
 
   // ── VeChain wallet login ────────────────────────────────────
   const loginWithWallet = async () => {
-    if (!hasConnex()) throw new Error("VeWorld wallet not detected. Please install VeWorld from veworld.net");
+    // Wait up to 3s for VeWorld to inject on mobile
+    const detected = await waitForConnex(3000);
+    if (!detected) throw new Error("VeWorld wallet not detected. Please install VeWorld from veworld.net");
 
     const address = await getWalletAddress();
     const nonceRes = await getNonce(address);
@@ -102,7 +104,8 @@ export function AuthProvider({ children }) {
 
   // ── Link wallet to existing email/Google account ────────────
   const linkWalletToAccount = async () => {
-    if (!hasConnex()) throw new Error("VeWorld wallet not detected. Please install VeWorld from veworld.net");
+    const detected = await waitForConnex(3000);
+    if (!detected) throw new Error("VeWorld wallet not detected. Please install VeWorld from veworld.net");
     const address = await getWalletAddress();
     const res = await linkWallet({ address });
     saveSession(res.data.token, res.data.user);

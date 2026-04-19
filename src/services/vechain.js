@@ -19,7 +19,25 @@ const REFUND_SIG        = "0x5b7baf64"; // claimRefund(uint256)
 const WITHDRAW_FEES_SIG = "0x164e68de"; // withdrawFees(address)
 
 // ─── Detect wallet ────────────────────────────────────────────
-export const hasConnex = () => !!(window.connex || window.vechain);
+// Checks all known VeWorld injection points
+export const hasConnex = () =>
+  !!(window.connex || window.vechain || window.vechain_vendor);
+
+// ─── Wait for VeWorld to inject (mobile can be slow) ─────────
+export const waitForConnex = (timeoutMs = 3000) =>
+  new Promise((resolve) => {
+    if (hasConnex()) return resolve(true);
+    const interval = setInterval(() => {
+      if (hasConnex()) {
+        clearInterval(interval);
+        resolve(true);
+      }
+    }, 100);
+    setTimeout(() => {
+      clearInterval(interval);
+      resolve(false); // timed out — not available
+    }, timeoutMs);
+  });
 
 // ─── Connex singleton ─────────────────────────────────────────
 let _connex = null;

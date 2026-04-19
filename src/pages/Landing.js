@@ -341,12 +341,32 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
   };
 
   const handleWallet = async () => {
-    // On mobile without VeWorld browser → show redirect UI
-    if (isMobile() && !(window.connex || window.vechain)) {
-      setShowVeWorldRedirect(true);
-      return;
+    setError("");
+
+    // On mobile: wait up to 3s for VeWorld to inject before deciding
+    if (isMobile()) {
+      setLoading(true);
+      const available = await new Promise((resolve) => {
+        if (window.connex || window.vechain || window.vechain_vendor) return resolve(true);
+        const interval = setInterval(() => {
+          if (window.connex || window.vechain || window.vechain_vendor) {
+            clearInterval(interval);
+            resolve(true);
+          }
+        }, 100);
+        setTimeout(() => { clearInterval(interval); resolve(false); }, 3000);
+      });
+      setLoading(false);
+
+      if (!available) {
+        // VeWorld not found even after waiting → show redirect UI
+        setShowVeWorldRedirect(true);
+        return;
+      }
     }
-    setError(""); setLoading(true);
+
+    // Desktop or mobile with VeWorld detected → proceed
+    setLoading(true);
     try {
       await loginWithWallet();
       onClose();
@@ -421,7 +441,7 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
               <svg width="16" height="16" viewBox="0 0 40 40" fill="none">
                 <path d="M20 4L36 13v14l-16 9L4 27V13L20 4z" stroke="#5C6BC0" strokeWidth="2.5" fill="none"/>
               </svg>
-              {loading ? "Connecting..." : "Connect with VeWorld"}
+              {loading ? "Detecting wallet..." : "Connect with VeWorld"}
             </button>
           )}
 
@@ -469,7 +489,6 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
     </div>
   );
 }
-
 // ─── Market Card ──────────────────────────────────────────────
 function MarketCard({ market, onPredict }) {
   const yesPercent = market.yesPercent ?? (market.totalPool > 0 ? Math.round(market.yesPool / market.totalPool * 100) : 50);
