@@ -91,23 +91,25 @@ export function AuthProvider({ children }) {
   // ── VeChain wallet login ─────────────────────────────────────
   // Uses Connex (VeWorld) to sign a nonce message
   const loginWithWallet = async () => {
-    if (!hasConnex()) throw new Error("VeWorld wallet not detected. Please install VeWorld from veworld.net");
-
-    // Get wallet address via Connex cert
-    const address = await getWalletAddress();
-
-    // Get nonce from server
-    const nonceRes = await getNonce(address);
-    const { message } = nonceRes.data;
-
-    // Sign with VeWorld
-    const signature = await signAuthMessage(address, message);
-
-    // Verify with server and get JWT
-    const authRes = await loginWallet({ address, signature });
-    saveSession(authRes.data.token, authRes.data.user);
-    return authRes.data.user;
-  };
+  if (!hasConnex()) throw new Error("VeWorld wallet not detected.");
+  
+  const address = await getWalletAddress();
+  const nonceRes = await getNonce(address);
+  const { message } = nonceRes.data;
+  
+  // certResult should be { signature, signer }
+  const certResult = await signAuthMessage(address, message);
+  
+  console.log("certResult:", certResult); // 👈 add this temporarily
+  
+  const authRes = await loginWallet({ 
+    address, 
+    signature: certResult.signature,
+    signer: certResult.signer,
+  });
+  saveSession(authRes.data.token, authRes.data.user);
+  return authRes.data.user;
+};
 
   // ── Link wallet to existing email/Google account ────────────
   const linkWalletToAccount = async () => {

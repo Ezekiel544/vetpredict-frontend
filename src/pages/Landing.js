@@ -255,7 +255,7 @@ const injectStyles = (theme) => {
   el.id = id; el.textContent = css;
   document.head.appendChild(el);
 };
-
+const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 // ─── Static Data ──────────────────────────────────────────────
 const FILTERS = ["All","Sports","Crypto","Entertainment","Politics","Gaming","Stocks"];
 
@@ -334,12 +334,36 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
     } finally { setLoading(false); }
   };
 
+  // const handleWallet = async () => {
+  //   setError(""); setLoading(true);
+  //   try { await loginWithWallet(); onClose(); }
+  //   catch (err) { setError(err.response?.data?.error || err.message || "Wallet connection failed. Make sure VeWorld is installed."); }
+  //   finally { setLoading(false); }
+  // };
   const handleWallet = async () => {
-    setError(""); setLoading(true);
-    try { await loginWithWallet(); onClose(); }
-    catch (err) { setError(err.response?.data?.error || err.message || "Wallet connection failed. Make sure VeWorld is installed."); }
-    finally { setLoading(false); }
-  };
+  setError(""); setLoading(true);
+  try { 
+    await loginWithWallet(); 
+    onClose(); 
+  } catch (err) {
+    const msg = err.message || "";
+    if (msg.includes("Opening VeWorld app")) {
+      setError("Redirecting you to VeWorld app...");
+    } else if (msg.includes("not detected")) {
+      setError(
+        isMobile()
+          ? "Please open this site inside the VeWorld app browser."
+          : "VeWorld not detected. Install it from veworld.net"
+      );
+    } else {
+      setError(msg || "Wallet connection failed. Make sure VeWorld is installed.");
+    }
+  } finally { 
+    setLoading(false); 
+  }
+};
+
+
 
   if (!open) return null;
   return (

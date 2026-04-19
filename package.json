@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "@vechain/dapp-kit": "^2.1.2",
+    "@vechain/dapp-kit-react": "^2.1.2",
+    "@vechain/dapp-kit-ui": "^2.1.2",
     "axios": "^1.6.2",
     "lucide-react": "^1.8.0",
     "react": "^18.2.0",
