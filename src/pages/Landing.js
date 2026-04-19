@@ -310,12 +310,18 @@ const scrollTo = (id) => {
 // ─── Auth Modal ───────────────────────────────────────────────
 function AuthModal({ open, onClose, defaultTab, marketTitle }) {
   const { loginWithEmail, signupWithEmail, loginWithWallet } = useAuth();
-  const [tab, setTab]         = useState(defaultTab || "signup");
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-  const [form, setForm]       = useState({ email:"", password:"", displayName:"" });
+  const [tab, setTab]                     = useState(defaultTab || "signup");
+  const [loading, setLoading]             = useState(false);
+  const [error, setError]                 = useState("");
+  const [form, setForm]                   = useState({ email:"", password:"", displayName:"" });
+  const [showVeWorldRedirect, setShowVeWorldRedirect] = useState(false);
 
-  useEffect(() => { setTab(defaultTab || "signup"); setError(""); }, [defaultTab, open]);
+  useEffect(() => {
+    setTab(defaultTab || "signup");
+    setError("");
+    setShowVeWorldRedirect(false);
+  }, [defaultTab, open]);
+
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
@@ -334,36 +340,22 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
     } finally { setLoading(false); }
   };
 
-  // const handleWallet = async () => {
-  //   setError(""); setLoading(true);
-  //   try { await loginWithWallet(); onClose(); }
-  //   catch (err) { setError(err.response?.data?.error || err.message || "Wallet connection failed. Make sure VeWorld is installed."); }
-  //   finally { setLoading(false); }
-  // };
   const handleWallet = async () => {
-  setError(""); setLoading(true);
-  try { 
-    await loginWithWallet(); 
-    onClose(); 
-  } catch (err) {
-    const msg = err.message || "";
-    if (msg.includes("Opening VeWorld app")) {
-      setError("Redirecting you to VeWorld app...");
-    } else if (msg.includes("not detected")) {
-      setError(
-        isMobile()
-          ? "Please open this site inside the VeWorld app browser."
-          : "VeWorld not detected. Install it from veworld.net"
-      );
-    } else {
-      setError(msg || "Wallet connection failed. Make sure VeWorld is installed.");
+    // On mobile without VeWorld browser → show redirect UI
+    if (isMobile() && !(window.connex || window.vechain)) {
+      setShowVeWorldRedirect(true);
+      return;
     }
-  } finally { 
-    setLoading(false); 
-  }
-};
-
-
+    setError(""); setLoading(true);
+    try {
+      await loginWithWallet();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || "Wallet connection failed. Make sure VeWorld is installed.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!open) return null;
   return (
@@ -386,14 +378,53 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
             </div>
           )}
           <div className="modal-tabs">
-            <button className={`modal-tab${tab==="signup"?" active":""}`} onClick={()=>{setTab("signup");setError("");}}>Sign Up</button>
-            <button className={`modal-tab${tab==="login"?" active":""}`} onClick={()=>{setTab("login");setError("");}}>Log In</button>
+            <button className={`modal-tab${tab==="signup"?" active":""}`} onClick={()=>{setTab("signup");setError("");setShowVeWorldRedirect(false);}}>Sign Up</button>
+            <button className={`modal-tab${tab==="login"?" active":""}`} onClick={()=>{setTab("login");setError("");setShowVeWorldRedirect(false);}}>Log In</button>
           </div>
+
           {error && <div className="error-msg">{error}</div>}
-          <button className="btn btn-vechain btn-block" style={{marginBottom:8}} onClick={handleWallet} disabled={loading}>
-            <svg width="16" height="16" viewBox="0 0 40 40" fill="none"><path d="M20 4L36 13v14l-16 9L4 27V13L20 4z" stroke="#5C6BC0" strokeWidth="2.5" fill="none"/></svg>
-            {loading ? "Connecting..." : "Connect with VeWorld"}
-          </button>
+
+          {/* VeWorld Button or Mobile Redirect UI */}
+          {showVeWorldRedirect ? (
+            <div style={{background:"#EEEEFF",border:"1.5px solid rgba(92,107,192,0.4)",borderRadius:10,padding:"16px",marginBottom:8,textAlign:"center"}}>
+              <div style={{fontSize:13,color:"#5C6BC0",fontWeight:600,marginBottom:12}}>
+                Open VeWorld app to connect your wallet
+              </div>
+              <a
+                href={`veworld://browser?url=${encodeURIComponent(window.location.href)}`}
+                style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"#5C6BC0",color:"#fff",padding:"11px 20px",borderRadius:8,fontWeight:600,fontSize:14,textDecoration:"none",marginBottom:10}}
+              >
+                <svg width="16" height="16" viewBox="0 0 40 40" fill="none">
+                  <path d="M20 4L36 13v14l-16 9L4 27V13L20 4z" stroke="#fff" strokeWidth="2.5" fill="none"/>
+                </svg>
+                Open in VeWorld
+              </a>
+              <a
+                href={/iPhone|iPad|iPod/i.test(navigator.userAgent)
+                  ? "https://apps.apple.com/app/veworld/id1633613910"
+                  : "https://play.google.com/store/apps/details?id=com.vechain.wallet"}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{fontSize:12,color:"#5C6BC0",fontWeight:600,display:"block",marginBottom:10}}
+              >
+                Don't have VeWorld? Download it →
+              </a>
+              <span
+                style={{fontSize:12,color:"var(--text3)",cursor:"pointer"}}
+                onClick={()=>setShowVeWorldRedirect(false)}
+              >
+                ← Back
+              </span>
+            </div>
+          ) : (
+            <button className="btn btn-vechain btn-block" style={{marginBottom:8}} onClick={handleWallet} disabled={loading}>
+              <svg width="16" height="16" viewBox="0 0 40 40" fill="none">
+                <path d="M20 4L36 13v14l-16 9L4 27V13L20 4z" stroke="#5C6BC0" strokeWidth="2.5" fill="none"/>
+              </svg>
+              {loading ? "Connecting..." : "Connect with VeWorld"}
+            </button>
+          )}
+
           <button className="btn btn-google btn-block" style={{marginBottom:4}} onClick={()=>window.location.href=`${process.env.REACT_APP_API_URL}/auth/google`}>
             <svg width="16" height="16" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -403,6 +434,7 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
             </svg>
             Continue with Google
           </button>
+
           <div className="divider">or with email</div>
           {tab === "signup" && (
             <div className="form-group">

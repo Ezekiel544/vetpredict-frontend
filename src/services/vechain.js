@@ -1,29 +1,22 @@
 /**
  * VeChain wallet integration
  * Supports VeWorld 1.x (window.vechain)
- * Mobile: deep-links into VeWorld app browser
  */
 
-const NODE_URL   = process.env.REACT_APP_VECHAIN_NODE || "https://node-testnet.vechain.energy";
-const CONTRACT   = process.env.REACT_APP_CONTRACT_ADDRESS || "";
+const NODE_URL = process.env.REACT_APP_VECHAIN_NODE || "https://node-testnet.vechain.energy";
+const CONTRACT = process.env.REACT_APP_CONTRACT_ADDRESS || "";
 const GENESIS_ID = "0x000000000b2bce3c70bc649a02749e8687721b09ed2e15997f466536b20bb127";
 
-// ─── Mobile detection ─────────────────────────────────────────
-const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+// ─── ABI helpers ──────────────────────────────────────────────
+const encodeUint256 = (n) => BigInt(n).toString(16).padStart(64, "0");
+const encodeBool    = (b) => (b ? "1" : "0").padStart(64, "0");
+const toHex         = (n) => "0x" + BigInt(n).toString(16);
 
-// ─── Open site inside VeWorld app browser ────────────────────
-const openInVeWorld = () => {
-  const currentUrl = encodeURIComponent(window.location.href);
-  window.location.href = `veworld://browser?url=${currentUrl}`;
-
-  // Fallback: if VeWorld not installed, redirect to store after 2s
-  setTimeout(() => {
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    window.location.href = isIOS
-      ? "https://apps.apple.com/app/veworld/id1633613910"
-      : "https://play.google.com/store/apps/details?id=com.vechain.wallet";
-  }, 2000);
-};
+// ─── Function Selectors ───────────────────────────────────────
+const PREDICT_SIG       = "0xebd389fe"; // predict(uint256,bool)
+const CLAIM_SIG         = "0x677bd9ff"; // claimWinnings(uint256)
+const REFUND_SIG        = "0x5b7baf64"; // claimRefund(uint256)
+const WITHDRAW_FEES_SIG = "0x164e68de"; // withdrawFees(address)
 
 // ─── Detect wallet ────────────────────────────────────────────
 export const hasConnex = () => !!(window.connex || window.vechain);
@@ -51,30 +44,8 @@ const getVendor = async () => {
   return connex.vendor;
 };
 
-// ─── ABI helpers ──────────────────────────────────────────────
-const encodeUint256 = (n) => BigInt(n).toString(16).padStart(64, "0");
-const encodeBool    = (b) => (b ? "1" : "0").padStart(64, "0");
-const toHex         = (n) => "0x" + BigInt(n).toString(16);
-
-// ─── CORRECT Function Selectors (verified from hardhat) ───────
-const PREDICT_SIG       = "0xebd389fe"; // predict(uint256,bool)
-const CLAIM_SIG         = "0x677bd9ff"; // claimWinnings(uint256)
-const REFUND_SIG        = "0x5b7baf64"; // claimRefund(uint256)
-const WITHDRAW_FEES_SIG = "0x164e68de"; // withdrawFees(address)
-
 // ─── Get connected wallet address ────────────────────────────
 export const getWalletAddress = async () => {
-  // On mobile without VeWorld browser → deep link into VeWorld app
-  if (isMobile() && !hasConnex()) {
-    openInVeWorld();
-    throw new Error("Opening VeWorld app...");
-  }
-
-  // On desktop without VeWorld extension
-  if (!hasConnex()) {
-    throw new Error("VeWorld wallet not detected. Please install VeWorld from veworld.net");
-  }
-
   const vendor = await getVendor();
   const result = await vendor.sign("cert", {
     purpose: "identification",
@@ -85,12 +56,6 @@ export const getWalletAddress = async () => {
 
 // ─── Sign auth message ────────────────────────────────────────
 export const signAuthMessage = async (address, message) => {
-  // On mobile without VeWorld browser → deep link into VeWorld app
-  if (isMobile() && !hasConnex()) {
-    openInVeWorld();
-    throw new Error("Opening VeWorld app...");
-  }
-
   const vendor = await getVendor();
   const result = await vendor.sign("cert", {
     purpose: "agreement",
@@ -109,10 +74,6 @@ export const placePredictionOnChain = async ({ contractMarketId, isYes, stakeVet
   const vendor   = await getVendor();
   const stakeWei = toHex(BigInt(Math.round(Number(stakeVet) * 1e18)));
   const data     = `${PREDICT_SIG}${encodeUint256(contractMarketId)}${encodeBool(isYes)}`;
-
-  console.log("predict() calldata:", data);
-  console.log("stakeWei:", stakeWei);
-  console.log("contractMarketId:", contractMarketId, "isYes:", isYes);
 
   const result = await vendor
     .sign("tx", [{ to: CONTRACT, value: stakeWei, data }])

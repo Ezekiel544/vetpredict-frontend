@@ -6,11 +6,11 @@ import { io } from "socket.io-client";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user,    setUser]    = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [vetPrice,setVetPrice]= useState(0.045);
-  const [socket,  setSocket]  = useState(null);
-  const [liveBalance, setLiveBalance] = useState(null);
+  const [user,        setUser]       = useState(null);
+  const [loading,     setLoading]    = useState(true);
+  const [vetPrice,    setVetPrice]   = useState(0.045);
+  const [socket,      setSocket]     = useState(null);
+  const [liveBalance, setLiveBalance]= useState(null);
 
   // ── Load user on mount ──────────────────────────────────────
   useEffect(() => {
@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
 
   // ── Live VET price every 5 minutes ─────────────────────────
   useEffect(() => {
-    const load = () => fetchVetPrice().then(r => setVetPrice(r.data.usd || 0.045)).catch(()=>{});
+    const load = () => fetchVetPrice().then(r => setVetPrice(r.data.usd || 0.045)).catch(() => {});
     load();
     const interval = setInterval(load, 5 * 60 * 1000);
     return () => clearInterval(interval);
@@ -44,7 +44,7 @@ export function AuthProvider({ children }) {
       if (bal !== null) setLiveBalance(bal);
     };
     load();
-    const interval = setInterval(load, 30 * 1000); // refresh every 30s
+    const interval = setInterval(load, 30 * 1000);
     return () => clearInterval(interval);
   }, [user?.walletAddress]);
 
@@ -53,17 +53,9 @@ export function AuthProvider({ children }) {
     if (!user) return;
     const s = io(process.env.REACT_APP_SOCKET_URL || "http://localhost:5001");
     s.emit("join_user", user._id || user.id);
-
-    // Real-time notification handler
-    s.on("notification", (notif) => {
-      // Trigger a refresh of notifications in any hook listening
-      window.dispatchEvent(new CustomEvent("pc_notification", { detail: notif }));
-    });
-
-    // Real-time market updates
-    s.on("market_created",  () => window.dispatchEvent(new Event("pc_market_update")));
-    s.on("market_resolved", () => window.dispatchEvent(new Event("pc_market_update")));
-
+    s.on("notification",    (notif) => window.dispatchEvent(new CustomEvent("pc_notification", { detail: notif })));
+    s.on("market_created",  ()      => window.dispatchEvent(new Event("pc_market_update")));
+    s.on("market_resolved", ()      => window.dispatchEvent(new Event("pc_market_update")));
     setSocket(s);
     return () => s.disconnect();
   }, [user?._id]);
@@ -88,37 +80,30 @@ export function AuthProvider({ children }) {
     return res.data.user;
   };
 
-  // ── VeChain wallet login ─────────────────────────────────────
-  // Uses Connex (VeWorld) to sign a nonce message
+  // ── VeChain wallet login ────────────────────────────────────
   const loginWithWallet = async () => {
-  if (!hasConnex()) throw new Error("VeWorld wallet not detected.");
-  
-  const address = await getWalletAddress();
-  const nonceRes = await getNonce(address);
-  const { message } = nonceRes.data;
-  
-  // certResult should be { signature, signer }
-  const certResult = await signAuthMessage(address, message);
-  
-  console.log("certResult:", certResult); // 👈 add this temporarily
-  
-  const authRes = await loginWallet({ 
-    address, 
-    signature: certResult.signature,
-    signer: certResult.signer,
-  });
-  saveSession(authRes.data.token, authRes.data.user);
-  return authRes.data.user;
-};
+    if (!hasConnex()) throw new Error("VeWorld wallet not detected. Please install VeWorld from veworld.net");
+
+    const address = await getWalletAddress();
+    const nonceRes = await getNonce(address);
+    const { message } = nonceRes.data;
+
+    const certResult = await signAuthMessage(address, message);
+
+    const authRes = await loginWallet({
+      address,
+      signature: certResult.signature,
+      signer:    certResult.signer,
+    });
+
+    saveSession(authRes.data.token, authRes.data.user);
+    return authRes.data.user;
+  };
 
   // ── Link wallet to existing email/Google account ────────────
   const linkWalletToAccount = async () => {
     if (!hasConnex()) throw new Error("VeWorld wallet not detected. Please install VeWorld from veworld.net");
-
-    // Get wallet address via VeWorld cert signing
     const address = await getWalletAddress();
-
-    // Link to existing account — VeWorld already verified ownership via cert
     const res = await linkWallet({ address });
     saveSession(res.data.token, res.data.user);
     return res.data.user;
@@ -147,15 +132,15 @@ export function AuthProvider({ children }) {
     const n = parseFloat(String(vet).replace(/[^0-9.]/g, ""));
     if (isNaN(n) || n === 0) return "$0.00";
     const usd = n * vetPrice;
-    if (usd >= 1000000) return `$${(usd/1000000).toFixed(2)}M`;
-    if (usd >= 1000)    return `$${(usd/1000).toFixed(1)}K`;
+    if (usd >= 1000000) return `$${(usd / 1000000).toFixed(2)}M`;
+    if (usd >= 1000)    return `$${(usd / 1000).toFixed(1)}K`;
     return `$${usd.toFixed(2)}`;
   };
 
   return (
     <AuthContext.Provider value={{
       user, loading, socket, vetPrice, toUsd,
-      liveBalance,  // live on-chain balance
+      liveBalance,
       loginWithEmail, signupWithEmail, loginWithWallet,
       linkWalletToAccount,
       logout, refreshUser, setUser,
