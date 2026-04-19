@@ -317,13 +317,11 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
   const [error, setError]                 = useState("");
   const [form, setForm]                   = useState({ email:"", password:"", displayName:"" });
   const [showVeWorldRedirect, setShowVeWorldRedirect] = useState(false);
-  const [debugInfo, setDebugInfo]         = useState("");
 
   useEffect(() => {
     setTab(defaultTab || "signup");
     setError("");
     setShowVeWorldRedirect(false);
-    setDebugInfo("");
   }, [defaultTab, open]);
 
   useEffect(() => {
@@ -344,56 +342,28 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
     } finally { setLoading(false); }
   };
 
-  const handleDebug = () => {
-    const keys = Object.keys(window).filter(k =>
-      k.toLowerCase().includes("ve") ||
-      k.toLowerCase().includes("connex") ||
-      k.toLowerCase().includes("wallet") ||
-      k.toLowerCase().includes("thor")
-    );
-    const info = [
-      "vechain: " + typeof window.vechain,
-      "connex: " + typeof window.connex,
-      "vechain_vendor: " + typeof window.vechain_vendor,
-      "thor: " + typeof window.thor,
-      "keys: " + (keys.join(", ") || "none"),
-    ].join("\n");
-    setDebugInfo(info);
-    alert(info);
-  };
-
   const handleWallet = async () => {
     setError("");
 
-    // On mobile: wait up to 3s for VeWorld to inject before deciding
-    if (isMobile()) {
+    // Direct check — window.vechain confirmed available in VeWorld browser
+    if (window.connex || window.vechain || window.vechain_vendor) {
       setLoading(true);
-      const available = await new Promise((resolve) => {
-        if (window.connex || window.vechain || window.vechain_vendor) return resolve(true);
-        const interval = setInterval(() => {
-          if (window.connex || window.vechain || window.vechain_vendor) {
-            clearInterval(interval);
-            resolve(true);
-          }
-        }, 100);
-        setTimeout(() => { clearInterval(interval); resolve(false); }, 3000);
-      });
-      setLoading(false);
-
-      if (!available) {
-        setShowVeWorldRedirect(true);
-        return;
+      try {
+        await loginWithWallet();
+        onClose();
+      } catch (err) {
+        setError(err.response?.data?.error || err.message || "Wallet connection failed. Make sure VeWorld is installed.");
+      } finally {
+        setLoading(false);
       }
+      return;
     }
 
-    setLoading(true);
-    try {
-      await loginWithWallet();
-      onClose();
-    } catch (err) {
-      setError(err.response?.data?.error || err.message || "Wallet connection failed. Make sure VeWorld is installed.");
-    } finally {
-      setLoading(false);
+    // Wallet not found → show redirect UI (mobile) or error (desktop)
+    if (isMobile()) {
+      setShowVeWorldRedirect(true);
+    } else {
+      setError("VeWorld not detected. Install the extension from veworld.net");
     }
   };
 
@@ -423,19 +393,6 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
           </div>
 
           {error && <div className="error-msg">{error}</div>}
-
-          {/* 🐛 TEMP DEBUG BUTTON — remove after testing */}
-          <button
-            style={{fontSize:11,color:"#999",background:"#f5f5f5",border:"1px solid #ddd",borderRadius:6,padding:"6px 10px",marginBottom:8,width:"100%",cursor:"pointer"}}
-            onClick={handleDebug}
-          >
-            🔍 Debug: Check wallet injection
-          </button>
-          {debugInfo && (
-            <div style={{fontSize:10,color:"#666",background:"#f9f9f9",border:"1px solid #eee",borderRadius:6,padding:"8px",marginBottom:8,whiteSpace:"pre",wordBreak:"break-all"}}>
-              {debugInfo}
-            </div>
-          )}
 
           {/* VeWorld Button or Mobile Redirect UI */}
           {showVeWorldRedirect ? (
@@ -469,7 +426,7 @@ function AuthModal({ open, onClose, defaultTab, marketTitle }) {
               <svg width="16" height="16" viewBox="0 0 40 40" fill="none">
                 <path d="M20 4L36 13v14l-16 9L4 27V13L20 4z" stroke="#5C6BC0" strokeWidth="2.5" fill="none"/>
               </svg>
-              {loading ? "Detecting wallet..." : "Connect with VeWorld"}
+              {loading ? "Connecting..." : "Connect with VeWorld"}
             </button>
           )}
 
