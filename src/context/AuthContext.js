@@ -1,12 +1,9 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { getMe, loginEmail, signupEmail, getNonce, loginWallet, fetchVetPrice, linkWallet } from "../services/api";
-import { getWalletAddress, signAuthMessage, getVetBalance } from "../services/vechain";
+import { getWalletAddress, signAuthMessage, getVetBalance, waitForConnex } from "../services/vechain";
 import { io } from "socket.io-client";
 
 const AuthContext = createContext(null);
-
-// ─── Detect VeWorld wallet ────────────────────────────────────
-const walletAvailable = () => !!(window.connex || window.vechain || window.vechain_vendor);
 
 export function AuthProvider({ children }) {
   const [user,        setUser]       = useState(null);
@@ -85,8 +82,12 @@ export function AuthProvider({ children }) {
 
   // ── VeChain wallet login ────────────────────────────────────
   const loginWithWallet = async () => {
-    if (!walletAvailable())
-      throw new Error("VeWorld wallet not detected. Please install VeWorld from veworld.net");
+    // Wait up to 5 seconds for VeWorld to inject
+    const ready = await waitForConnex(5000);
+
+    if (!ready) {
+      throw new Error("VeWorld wallet not detected. Please open this site inside VeWorld browser.");
+    }
 
     const address  = await getWalletAddress();
     const nonceRes = await getNonce(address);
@@ -106,8 +107,13 @@ export function AuthProvider({ children }) {
 
   // ── Link wallet to existing email/Google account ────────────
   const linkWalletToAccount = async () => {
-    if (!walletAvailable())
-      throw new Error("VeWorld wallet not detected. Please install VeWorld from veworld.net");
+    // Wait up to 5 seconds for VeWorld to inject
+    const ready = await waitForConnex(5000);
+
+    if (!ready) {
+      throw new Error("VeWorld wallet not detected. Please open this site inside VeWorld browser.");
+    }
+
     const address = await getWalletAddress();
     const res = await linkWallet({ address });
     saveSession(res.data.token, res.data.user);
