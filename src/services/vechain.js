@@ -31,40 +31,45 @@ export const openInVeWorld = () => {
   setTimeout(() => { window.location.href = "https://www.veworld.net"; }, 2000);
 };
 
-// ─── Connex singleton ─────────────────────────────────────────
-let _connex = null;
-const getConnex = async () => {
-  if (_connex) return _connex;
+// ─── Get vendor — tries every known VeWorld injection point ───
+const getVendor = async () => {
+  // Wait a moment for VeWorld to finish injecting
+  await new Promise(r => setTimeout(r, 500));
 
-  // VeWorld mobile injects window.vechain
+  // Desktop VeWorld extension
+  if (window.connex?.vendor) return window.connex.vendor;
+
   if (window.vechain) {
-    try {
-      if (typeof window.vechain.newConnex === "function") {
-        _connex = await window.vechain.newConnex({
-          node:    NODE_URL,
-          network: { id: GENESIS_ID },
-        });
-        return _connex;
-      }
-      // Some versions expose connex directly on window.vechain
-      if (window.vechain.connex) {
-        _connex = window.vechain.connex;
-        return _connex;
-      }
-      // Some versions expose thor/vendor directly
-      if (window.vechain.thor) {
-        _connex = window.vechain;
-        return _connex;
-      }
-    } catch (e) {
-      throw new Error("VeWorld connection failed: " + e.message);
-    }
-  }
+    // VeWorld mobile — vendor directly on window.vechain
+    if (typeof window.vechain.vendor?.sign === "function")
+      return window.vechain.vendor;
 
-  // Desktop VeWorld extension injects window.connex
-  if (window.connex) {
-    _connex = window.connex;
-    return _connex;
+    // VeWorld mobile — newConnexSigner
+    if (typeof window.vechain.newConnexSigner === "function") {
+      const signer = await window.vechain.newConnexSigner(GENESIS_ID);
+      if (signer) return signer;
+    }
+
+    // VeWorld mobile — newConnex
+    if (typeof window.vechain.newConnex === "function") {
+      const cx = await window.vechain.newConnex({
+        node:    NODE_URL,
+        network: { id: GENESIS_ID },
+      });
+      if (cx?.vendor) return cx.vendor;
+    }
+
+    // VeWorld mobile — connex nested
+    if (window.vechain.connex?.vendor)
+      return window.vechain.connex.vendor;
+
+    // VeWorld mobile — thor/vendor directly
+    if (typeof window.vechain.thor !== "undefined")
+      return window.vechain;
+
+    // Last resort — treat window.vechain itself as vendor
+    if (typeof window.vechain.sign === "function")
+      return window.vechain;
   }
 
   // Not inside VeWorld — redirect mobile users
@@ -73,15 +78,10 @@ const getConnex = async () => {
     throw new Error("OPEN_IN_VEWORLD");
   }
 
-  throw new Error("VeWorld wallet not detected. Please install VeWorld from veworld.net");
-};
-
-const getVendor = async () => {
-  const connex = await getConnex();
-  // Handle different vendor locations
-  if (connex.vendor) return connex.vendor;
-  if (window.vechain?.vendor) return window.vechain.vendor;
-  throw new Error("VeWorld vendor not found. Please update your VeWorld app.");
+  throw new Error(
+    "VeWorld vendor not found. vechain keys: " +
+    Object.keys(window.vechain || {}).join(", ")
+  );
 };
 
 export const getWalletAddress = async () => {
