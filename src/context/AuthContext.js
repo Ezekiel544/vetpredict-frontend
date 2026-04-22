@@ -83,11 +83,11 @@ export function AuthProvider({ children }) {
   // ── VeChain wallet login ────────────────────────────────────
   const loginWithWallet = async () => {
     // DEBUG — remove after testing
-    alert(
-      "connex: " + typeof window.connex +
-      " | vechain: " + typeof window.vechain +
-      " | vendor: " + typeof window.vechain_vendor
-    );
+    // alert(
+    //   "connex: " + typeof window.connex +
+    //   " | vechain: " + typeof window.vechain +
+    //   " | vendor: " + typeof window.vechain_vendor
+    // );
 
     // Wait up to 5 seconds for VeWorld to inject
     const ready = await waitForConnex(5000);
