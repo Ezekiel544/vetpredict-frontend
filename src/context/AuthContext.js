@@ -88,9 +88,9 @@ export function AuthProvider({ children }) {
     //   " | vechain: " + typeof window.vechain +
     //   " | vendor: " + typeof window.vechain_vendor
     // );
-    alert(
-  "vechain keys: " + Object.keys(window.vechain || {}).join(", ")
-);
+//     alert(
+//   "vechain keys: " + Object.keys(window.vechain || {}).join(", ")
+// );
 
     // Wait up to 5 seconds for VeWorld to inject
     const ready = await waitForConnex(5000);
