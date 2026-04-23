@@ -31,24 +31,25 @@ export const openInVeWorld = () => {
   setTimeout(() => { window.location.href = "https://www.veworld.net"; }, 2000);
 };
 
-// ─── Get vendor ───────────────────────────────────────────────
-let _vendor = null;
-const getVendor = async () => {
-  if (_vendor) return _vendor;
+// ─── Get signer ───────────────────────────────────────────────
+let _signer = null;
+const getSigner = async () => {
+  if (_signer) return _signer;
 
-  // Desktop VeWorld extension
+  // Desktop VeWorld extension — uses old .sign() style
   if (window.connex?.vendor) {
-    _vendor = window.connex.vendor;
-    return _vendor;
+    // Wrap old API to match new style
+    _signer = {
+      isLegacy: true,
+      vendor: window.connex.vendor,
+    };
+    return _signer;
   }
 
-  // VeWorld mobile — newConnexSigner
+  // VeWorld mobile — newConnexSigner returns { signCert, signTx }
   if (window.vechain?.newConnexSigner) {
-    const signer = await window.vechain.newConnexSigner(GENESIS_ID);
-    // DEBUG — remove after testing
-    alert("signer type: " + typeof signer + " | keys: " + Object.keys(signer || {}).join(", "));
-    _vendor = signer;
-    return _vendor;
+    _signer = await window.vechain.newConnexSigner(GENESIS_ID);
+    return _signer;
   }
 
   if (isMobileBrowser()) {
@@ -59,21 +60,41 @@ const getVendor = async () => {
   throw new Error("VeWorld wallet not detected. Please open this site inside VeWorld browser.");
 };
 
+// ─── Sign a certificate ───────────────────────────────────────
+const signCert = async (message) => {
+  const signer = await getSigner();
+  if (signer.isLegacy) {
+    // Desktop extension — old API
+    return await signer.vendor.sign("cert", message).request();
+  }
+  // Mobile — new API
+  return await signer.signCert(message, {});
+};
+
+// ─── Sign a transaction ───────────────────────────────────────
+const signTx = async (clauses, comment) => {
+  const signer = await getSigner();
+  if (signer.isLegacy) {
+    // Desktop extension — old API
+    return await signer.vendor.sign("tx", clauses).comment(comment).request();
+  }
+  // Mobile — new API
+  return await signer.signTx(clauses, { comment });
+};
+
 export const getWalletAddress = async () => {
-  const vendor = await getVendor();
-  const result = await vendor.sign("cert", {
+  const result = await signCert({
     purpose: "identification",
     payload: { type: "text", content: "Connect to PredictChain" },
-  }).request();
+  });
   return result.annex.signer.toLowerCase();
 };
 
 export const signAuthMessage = async (address, message) => {
-  const vendor = await getVendor();
-  const result = await vendor.sign("cert", {
+  const result = await signCert({
     purpose: "agreement",
     payload: { type: "text", content: message },
-  }).request();
+  });
   return {
     signature: result.annex?.signature || result.signature || "",
     signer:    result.annex?.signer    || address,
@@ -82,47 +103,43 @@ export const signAuthMessage = async (address, message) => {
 
 export const placePredictionOnChain = async ({ contractMarketId, isYes, stakeVet }) => {
   if (!CONTRACT) throw new Error("Contract address not set. Check .env");
-  const vendor   = await getVendor();
   const stakeWei = toHex(BigInt(Math.round(Number(stakeVet) * 1e18)));
   const data     = `${PREDICT_SIG}${encodeUint256(contractMarketId)}${encodeBool(isYes)}`;
-  const result   = await vendor
-    .sign("tx", [{ to: CONTRACT, value: stakeWei, data }])
-    .comment(`Predict ${isYes ? "YES" : "NO"} with ${stakeVet} VET`)
-    .request();
+  const result   = await signTx(
+    [{ to: CONTRACT, value: stakeWei, data }],
+    `Predict ${isYes ? "YES" : "NO"} with ${stakeVet} VET`
+  );
   return result.txid;
 };
 
 export const claimWinningsOnChain = async ({ contractPredictionId }) => {
   if (!CONTRACT) throw new Error("Contract address not set.");
-  const vendor = await getVendor();
   const data   = `${CLAIM_SIG}${encodeUint256(contractPredictionId)}`;
-  const result = await vendor
-    .sign("tx", [{ to: CONTRACT, value: "0x0", data }])
-    .comment("Claim prediction winnings")
-    .request();
+  const result = await signTx(
+    [{ to: CONTRACT, value: "0x0", data }],
+    "Claim prediction winnings"
+  );
   return result.txid;
 };
 
 export const claimRefundOnChain = async ({ contractPredictionId }) => {
   if (!CONTRACT) throw new Error("Contract address not set.");
-  const vendor = await getVendor();
   const data   = `${REFUND_SIG}${encodeUint256(contractPredictionId)}`;
-  const result = await vendor
-    .sign("tx", [{ to: CONTRACT, value: "0x0", data }])
-    .comment("Claim market refund")
-    .request();
+  const result = await signTx(
+    [{ to: CONTRACT, value: "0x0", data }],
+    "Claim market refund"
+  );
   return result.txid;
 };
 
 export const withdrawFeesOnChain = async ({ toAddress }) => {
   if (!CONTRACT) throw new Error("Contract address not set.");
-  const vendor        = await getVendor();
   const paddedAddress = toAddress.replace("0x", "").toLowerCase().padStart(64, "0");
   const data          = `${WITHDRAW_FEES_SIG}${paddedAddress}`;
-  const result        = await vendor
-    .sign("tx", [{ to: CONTRACT, value: "0x0", data }])
-    .comment("Withdraw platform fees")
-    .request();
+  const result        = await signTx(
+    [{ to: CONTRACT, value: "0x0", data }],
+    "Withdraw platform fees"
+  );
   return result.txid;
 };
 
