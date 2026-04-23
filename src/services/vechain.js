@@ -36,19 +36,21 @@ let _vendor = null;
 const getVendor = async () => {
   if (_vendor) return _vendor;
 
-  // Desktop VeWorld extension — window.connex
+  // Desktop VeWorld extension
   if (window.connex?.vendor) {
     _vendor = window.connex.vendor;
     return _vendor;
   }
 
-  // VeWorld mobile — newConnexSigner returns the signer/vendor directly
+  // VeWorld mobile — newConnexSigner
   if (window.vechain?.newConnexSigner) {
-    _vendor = await window.vechain.newConnexSigner(GENESIS_ID);
+    const signer = await window.vechain.newConnexSigner(GENESIS_ID);
+    // DEBUG — remove after testing
+    alert("signer type: " + typeof signer + " | keys: " + Object.keys(signer || {}).join(", "));
+    _vendor = signer;
     return _vendor;
   }
 
-  // Not inside VeWorld — redirect mobile users
   if (isMobileBrowser()) {
     openInVeWorld();
     throw new Error("OPEN_IN_VEWORLD");
